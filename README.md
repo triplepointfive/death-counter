@@ -56,12 +56,11 @@ No Python or any runtime is needed on Windows — just download and run.
 ### Prerequisites
 
 - Python 3.9+
-- `pip install pyinstaller`
 
 ### Build
 
 ```bash
-pip install pyinstaller
+pip install -r requirements.txt
 pyinstaller --onefile --windowed --name "Death Counter" death_counter.py
 ```
 
@@ -70,7 +69,6 @@ The executable will be at `dist/Death Counter.exe` (Windows) or `dist/Death Coun
 ### Run without building
 
 ```bash
-pip install -r /dev/null  # no external dependencies
 python death_counter.py
 ```
 
