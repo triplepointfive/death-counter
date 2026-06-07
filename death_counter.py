@@ -4,11 +4,20 @@ import sys
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+if sys.platform == "win32":
+    DATA_DIR = os.path.join(os.environ["APPDATA"], "death-counter")
+else:
+    DATA_DIR = os.path.join(os.path.expanduser("~"), ".local", "share", "death-counter")
+
 DATA_FILE = os.path.join(DATA_DIR, "deaths.json")
 
 
+def _ensure_data_dir():
+    os.makedirs(DATA_DIR, exist_ok=True)
+
+
 def load_data():
+    _ensure_data_dir()
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -16,6 +25,7 @@ def load_data():
 
 
 def save_data(data):
+    _ensure_data_dir()
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
