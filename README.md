@@ -10,6 +10,7 @@ Built with Python and tkinter. The counter is incremented manually — no automa
 - **Persistent storage** — data is saved to your OS application data directory (`%APPDATA%/death-counter/` on Windows, `~/.local/share/death-counter/` on Linux)
 - **Manual +1** — click a button, die one more time
 - **Set any value** — need to correct the count? Set it to whatever number you want
+- **Run timer** — track how long each attempt takes (Start / Pause / Reset). Persists between sessions and resumes automatically
 - **Portable executable** — no Python installation required for the pre-built binary
 
 ## Screenshot
@@ -26,7 +27,10 @@ Built with Python and tkinter. The counter is incremented manually — no automa
 │  └─────┘  │                          │
 │ [+Add]    │  [ +1 Death ]            │
 │ [Remove]  │  [ Set Value ]           │
-└───────────┴──────────────────────────┘
+│           ├──────────────────────────┤
+│           │  Run Timer               │
+│           │     ⏱ 01:23:45          │
+│           │  [Start] [Reset]         │
 ```
 
 ## Usage
@@ -36,7 +40,8 @@ Built with Python and tkinter. The counter is incremented manually — no automa
 3. Select a game from the list
 4. Click **+1 Death** every time you die
 5. Use **Set Value** if you need to adjust the number manually
-6. Close the window — your data is saved automatically
+6. Use the **Run Timer** below to measure attempt duration — Start, Pause, and Reset are independent per game
+7. Close the window — your data is saved automatically
 
 All data persists between sessions. You can delete the executable and re-download it — your counters are safe in the app data directory.
 

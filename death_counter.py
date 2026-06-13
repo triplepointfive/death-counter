@@ -1,6 +1,8 @@
 import json
 import os
+import shutil
 import sys
+import time
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
@@ -26,25 +28,138 @@ def load_data():
 
 def save_data(data):
     _ensure_data_dir()
+    if os.path.exists(DATA_FILE):
+        shutil.copy2(DATA_FILE, DATA_FILE + ".bak")
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
+
+
+def _format_time(seconds):
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
 
 class DeathCounter:
     def __init__(self, root):
         self.root = root
         self.root.title("Death Counter")
-        self.root.geometry("500x400")
-        self.root.minsize(400, 300)
+        self.root.geometry("500x460")
+        self.root.minsize(400, 360)
 
         self.data = load_data()
         self.current_game = self.data.get("current")
         if self.current_game not in self.data.get("games", {}):
             self.current_game = None
 
+        self._timer_start_time = None
+        self._timer_job_id = None
+
         self._build_ui()
         self._refresh_game_list()
         self._update_display()
+
+        self._resume_timer()
+
+    def _resume_timer(self):
+        if self.current_game:
+            timers = self.data.setdefault("timers", {})
+            tdata = timers.get(self.current_game)
+            if tdata and tdata.get("running"):
+                self._timer_start_time = time.time()
+                self._timer_update()
+
+    def _timer_update(self):
+        if not self.current_game or self._timer_start_time is None:
+            return
+        timers = self.data.setdefault("timers", {})
+        tdata = timers.get(self.current_game)
+        if not tdata or not tdata.get("running"):
+            return
+        elapsed = tdata["elapsed"] + (time.time() - self._timer_start_time)
+        self.timer_label.config(text=_format_time(elapsed))
+        self._timer_job_id = self.root.after(200, self._timer_update)
+
+    def _timer_get_current(self):
+        if not self.current_game:
+            return 0.0
+        timers = self.data.setdefault("timers", {})
+        tdata = timers.setdefault(self.current_game, {"elapsed": 0.0, "running": False})
+        if tdata.get("running") and self._timer_start_time is not None:
+            return tdata["elapsed"] + (time.time() - self._timer_start_time)
+        return tdata["elapsed"]
+
+    def _timer_save_state(self):
+        if self.current_game:
+            save_data(self.data)
+
+    def _timer_start(self):
+        if not self.current_game:
+            return
+        timers = self.data.setdefault("timers", {})
+        tdata = timers.setdefault(self.current_game, {"elapsed": 0.0, "running": False})
+        if tdata.get("running"):
+            return
+        tdata["running"] = True
+        self._timer_start_time = time.time()
+        self._update_timer_buttons()
+        self._timer_update()
+        self._timer_save_state()
+
+    def _timer_pause(self):
+        if not self.current_game:
+            return
+        timers = self.data.setdefault("timers", {})
+        tdata = timers.get(self.current_game)
+        if not tdata or not tdata.get("running"):
+            return
+        tdata["running"] = False
+        if self._timer_start_time is not None:
+            tdata["elapsed"] += time.time() - self._timer_start_time
+            self._timer_start_time = None
+        if self._timer_job_id:
+            self.root.after_cancel(self._timer_job_id)
+            self._timer_job_id = None
+        self.timer_label.config(text=_format_time(tdata["elapsed"]))
+        self._update_timer_buttons()
+        self._timer_save_state()
+
+    def _timer_reset(self):
+        if not self.current_game:
+            return
+        timers = self.data.setdefault("timers", {})
+        tdata = timers.setdefault(self.current_game, {"elapsed": 0.0, "running": False})
+        was_running = tdata.get("running")
+        tdata["elapsed"] = 0.0
+        tdata["running"] = False
+        self._timer_start_time = None
+        if self._timer_job_id:
+            self.root.after_cancel(self._timer_job_id)
+            self._timer_job_id = None
+        self.timer_label.config(text="00:00:00")
+        self._update_timer_buttons()
+        if was_running:
+            self._timer_start()
+        self._timer_save_state()
+
+    def _update_timer_buttons(self):
+        if not self.current_game:
+            self.start_btn.pack_forget()
+            self.pause_btn.pack_forget()
+            self.reset_btn.pack_forget()
+            return
+        timers = self.data.setdefault("timers", {})
+        tdata = timers.get(self.current_game, {"elapsed": 0.0, "running": False})
+        running = tdata.get("running", False)
+        if running:
+            self.start_btn.pack_forget()
+            self.pause_btn.pack(side=tk.LEFT, padx=2)
+            self.reset_btn.pack(side=tk.LEFT, padx=2)
+        else:
+            self.pause_btn.pack_forget()
+            self.start_btn.pack(side=tk.LEFT, padx=2)
+            self.reset_btn.pack(side=tk.LEFT, padx=2)
 
     def _build_ui(self):
         paned = ttk.PanedWindow(self.root, orient=tk.HORIZONTAL)
@@ -101,14 +216,47 @@ class DeathCounter:
             command=self._add_death,
             width=15,
         )
-        death_btn.pack(pady=3)
+        death_btn.pack(pady=2)
 
         set_btn = ttk.Button(
             btn_frame, text="Set Value",
             command=self._set_value,
             width=15,
         )
-        set_btn.pack(pady=3)
+        set_btn.pack(pady=2)
+
+        sep = ttk.Separator(right_frame, orient=tk.HORIZONTAL)
+        sep.pack(fill=tk.X, pady=(12, 8))
+
+        timer_header = ttk.Label(
+            right_frame, text="Run Timer",
+            font=("Segoe UI", 10, "bold"), anchor=tk.CENTER
+        )
+        timer_header.pack()
+
+        self.timer_label = ttk.Label(
+            right_frame, text="00:00:00",
+            font=("Segoe UI", 22, "bold"), anchor=tk.CENTER,
+            foreground="#2980b9"
+        )
+        self.timer_label.pack(pady=(2, 5))
+
+        timer_btn_frame = ttk.Frame(right_frame)
+        timer_btn_frame.pack()
+
+        self.start_btn = ttk.Button(
+            timer_btn_frame, text="Start",
+            command=self._timer_start, width=8,
+        )
+        self.pause_btn = ttk.Button(
+            timer_btn_frame, text="Pause",
+            command=self._timer_pause, width=8,
+        )
+        self.reset_btn = ttk.Button(
+            timer_btn_frame, text="Reset",
+            command=self._timer_reset, width=8,
+        )
+        self.start_btn.pack(side=tk.LEFT, padx=2)
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -130,9 +278,13 @@ class DeathCounter:
             count = games.get(self.current_game, 0)
             self.game_label.config(text=self.current_game)
             self.count_label.config(text=str(count))
+            self.timer_label.config(text=_format_time(self._timer_get_current()))
+            self._update_timer_buttons()
         else:
             self.game_label.config(text="No game selected")
             self.count_label.config(text="—")
+            self.timer_label.config(text="—")
+            self._update_timer_buttons()
 
     def _on_game_select(self, event):
         sel = self.game_listbox.curselection()
@@ -169,7 +321,12 @@ class DeathCounter:
             parent=self.root,
         )
         if confirm:
+            if self._timer_job_id:
+                self.root.after_cancel(self._timer_job_id)
+                self._timer_job_id = None
+                self._timer_start_time = None
             del self.data["games"][self.current_game]
+            self.data.setdefault("timers", {}).pop(self.current_game, None)
             games = list(self.data["games"].keys())
             self.current_game = games[0] if games else None
             self.data["current"] = self.current_game
@@ -182,6 +339,7 @@ class DeathCounter:
             return
         self.data["games"][self.current_game] += 1
         self._update_display()
+        save_data(self.data)
 
     def _set_value(self):
         if not self.current_game:
@@ -198,9 +356,16 @@ class DeathCounter:
         if val is not None:
             self.data["games"][self.current_game] = val
             self._update_display()
+            save_data(self.data)
 
     def _on_close(self):
         self.data["current"] = self.current_game
+        if self.current_game:
+            timers = self.data.setdefault("timers", {})
+            tdata = timers.get(self.current_game)
+            if tdata and tdata.get("running") and self._timer_start_time is not None:
+                tdata["elapsed"] += time.time() - self._timer_start_time
+                self._timer_start_time = None
         save_data(self.data)
         self.root.destroy()
 
