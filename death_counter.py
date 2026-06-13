@@ -377,6 +377,12 @@ def main():
         windll.shcore.SetProcessDpiAwareness(1)
     except Exception:
         pass
+    ico = os.path.join(os.path.dirname(os.path.abspath(__file__)), "skull.ico")
+    if os.path.exists(ico):
+        try:
+            root.iconbitmap(ico)
+        except Exception:
+            pass
     app = DeathCounter(root)
     root.mainloop()
 
